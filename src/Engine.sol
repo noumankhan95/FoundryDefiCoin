@@ -10,6 +10,7 @@ contract PoolEngine {
     error PoolEngine__AmountMustbeMoreThanZero();
     error PoolEngine__CollateralTypeNotAllowed();
     error PoolEngine__CollateralTransferFailed();
+    error PoolEngine__RedeemFailed();
     //   Storage Values       //
     address[] public s_approvedTokens;
     mapping(address => address) s_tokenToPriceFeed;
@@ -22,10 +23,14 @@ contract PoolEngine {
     DSCToken internal s_dscToken;
     // Events
 
-    event DSCToken_minted(address indexed user);
-    event DSCToken_collateralDeposited(
+    event DSCEngine_minted(address indexed user);
+    event DSCEngine_collateralDeposited(
         address indexed user,
         uint256 indexed amount
+    );
+    event DSCEngine_collateralRedeemed(
+        address indexed user,
+        uint256 indexed _amount
     );
 
     //Constructor Values //
@@ -68,6 +73,13 @@ contract PoolEngine {
         mintDSC(_amount, _collateralAddress);
     }
 
+    function redeemCollateralAndBurnDSC(
+        uint256 _amount,
+        address _tokenCollateral
+    ) external {
+        redeemCollateral(_amount, _tokenCollateral);
+    }
+
     function depositCollateral(
         uint256 _amount,
         address _collateralAddress
@@ -77,7 +89,7 @@ contract PoolEngine {
             _collateralAddress,
             _amount
         );
-        emit DSCToken_collateralDeposited(msg.sender, _amount);
+        emit DSCEngine_collateralDeposited(msg.sender, _amount);
     }
 
     function mintDSC(
@@ -91,13 +103,29 @@ contract PoolEngine {
             _amount
         );
         s_dscToken.mintToken(msg.sender, _amount);
-        emit DSCToken_minted(msg.sender);
+        emit DSCEngine_minted(msg.sender);
         if (!success) {
             revert PoolEngine__CollateralTransferFailed();
         }
     }
 
-    function redeemCollateral() external {}
+    function burnDSC(uint256 _amount) internal {}
+
+    function redeemCollateral(
+        uint256 _amount,
+        address _collateralAddress
+    ) internal {
+        s_userToCollateral[msg.sender][_collateralAddress] -= _amount;
+        bool success = IERC20(_collateralAddress).transferFrom(
+            address(this),
+            msg.sender,
+            _amount
+        );
+        emit DSCEngine_collateralRedeemed(msg.sender, _amount);
+        if (!success) {
+            revert PoolEngine__RedeemFailed();
+        }
+    }
 
     function liquidate() external {}
 
@@ -120,10 +148,11 @@ contract PoolEngine {
             DIVISION_PRECISION;
     }
 
-    function calculateAmountToLend(
-        uint256 _amount
-    ) internal pure returns (uint256) {
-        return
-            (_amount * LIQUIDATION_THRESHOLD) / ADDITIONAL_DIVISION_PRECISION;
-    }
+    function checkHealthFactor(address user) public {}
+    // function calculateAmountToLend(
+    //     uint256 _amount
+    // ) internal pure returns (uint256) {
+    //     return
+    //         (_amount * LIQUIDATION_THRESHOLD) / ADDITIONAL_DIVISION_PRECISION;
+    // }
 }
