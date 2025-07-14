@@ -148,11 +148,23 @@ contract PoolEngine {
             DIVISION_PRECISION;
     }
 
-    function checkHealthFactor(address user) public {}
-    // function calculateAmountToLend(
-    //     uint256 _amount
-    // ) internal pure returns (uint256) {
-    //     return
-    //         (_amount * LIQUIDATION_THRESHOLD) / ADDITIONAL_DIVISION_PRECISION;
-    // }
+    function checkHealthFactor(address user) public returns (uint256) {
+        uint256 totalAmount;
+        for (uint256 i = 0; i < s_approvedTokens.length; i++) {
+            totalAmount += getCollateralAmountInUsd(
+                s_approvedTokens[i],
+                s_userToCollateral[msg.sender][s_approvedTokens[i]]
+            );
+        }
+        return
+            (calculateAdjustedCollateral(totalAmount) * DIVISION_PRECISION) /
+            s_usertomintedDSC[msg.sender];
+    }
+
+    function calculateAdjustedCollateral(
+        uint256 _amount
+    ) internal pure returns (uint256) {
+        return
+            (_amount * LIQUIDATION_THRESHOLD) / ADDITIONAL_DIVISION_PRECISION;
+    }
 }

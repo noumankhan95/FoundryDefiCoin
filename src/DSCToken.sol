@@ -6,7 +6,7 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 contract DSCToken is ERC20, Ownable {
     constructor() ERC20("LIFI Token", "LF") Ownable(msg.sender) {}
 
-    function mintToken(address account,uint256 _amount) external {
+    function mintToken(address account, uint256 _amount) external {
         _mint(account, _amount);
     }
 
