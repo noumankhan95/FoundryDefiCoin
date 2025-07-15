@@ -27,7 +27,7 @@ contract HelperConfig is Script {
             activeNetworkConfig = getSepoliaEthConfig();
             return activeNetworkConfig;
         } else {
-            revert HelperConfig__InvalidNetworkConfig();
+            return getAnvilConfig();
         }
     }
 
@@ -55,7 +55,7 @@ contract HelperConfig is Script {
             NetworkConfig({
                 wbtc: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
                 weth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
-                deployerKey: vm.envUint("key"),
+                deployerKey: vm.envUint("PRIVATE_KEY"),
                 wethUsdPriceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306, // ETH / USD
                 wbtcUsdPriceFeed: 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43
             });
@@ -76,7 +76,7 @@ contract HelperConfig is Script {
             NetworkConfig({
                 wbtc: address(wbtcMock),
                 weth: address(wethMock),
-                deployerKey: vm.envUint("key"),
+                deployerKey: vm.envUint("PRIVATE_KEY"),
                 wethUsdPriceFeed: address(wethPriceFeed),
                 wbtcUsdPriceFeed: address(wbtcPriceFeed)
             });

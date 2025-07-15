@@ -10,10 +10,7 @@ contract DeployContract {
     address[] public _approvedTokens;
     address[] public _tokenPriceFeeds;
 
-    function run()
-        external
-        returns (DSCToken, PoolEngine, HelperConfig.NetworkConfig memory)
-    {
+    function run() external returns (DSCToken, PoolEngine, HelperConfig) {
         HelperConfig helper = new HelperConfig();
         HelperConfig.NetworkConfig memory config = helper.run();
 
@@ -26,6 +23,6 @@ contract DeployContract {
             address(s_dscToken)
         );
         s_dscToken.transferOwnership(address(s_engine));
-        return (s_dscToken, s_engine, config);
+        return (s_dscToken, s_engine, helper);
     }
 }
