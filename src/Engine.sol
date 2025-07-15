@@ -13,6 +13,7 @@ contract PoolEngine {
     error PoolEngine__RedeemFailed();
     error PoolEngine__HealthyHealthFactor();
     error PoolEngine__LiquidatorUnHealthyHealthFactor();
+    error PoolEngine__MintFailed();
     //   Storage Values       //
     address[] public s_approvedTokens;
     mapping(address => address) s_tokenToPriceFeed;
@@ -24,7 +25,7 @@ contract PoolEngine {
     uint256 internal constant ADDITIONAL_DIVISION_PRECISION = 100;
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
     uint256 private constant INCENTIVE = 10;
-    DSCToken internal s_dscToken;
+    DSCToken internal immutable i_dscToken;
     // Events
 
     event DSCEngine_minted(address indexed user);
@@ -36,6 +37,7 @@ contract PoolEngine {
         address indexed user,
         uint256 indexed _amount
     );
+    event DSCEngine_tokensBurnt(address indexed user, uint256 indexed _amount);
 
     //Constructor Values //
     constructor(
@@ -51,7 +53,7 @@ contract PoolEngine {
             s_tokenToPriceFeed[_approvedTokens[i]] = _tokenPriceFeeds[i];
             s_approvedTokens.push(_approvedTokens[i]);
         }
-        s_dscToken = DSCToken(dSCTokenAddress);
+        i_dscToken = DSCToken(dSCTokenAddress);
     }
 
     // Modifiers
@@ -77,14 +79,6 @@ contract PoolEngine {
         mintDSC(_amount);
     }
 
-    function redeemCollateralAndBurnDSC(
-        uint256 _amount,
-        address _tokenCollateral
-    ) external {
-        redeemCollateral(_amount, _tokenCollateral, address(this), msg.sender);
-        burnDSC(msg.sender, _amount);
-    }
-
     function depositCollateral(
         uint256 _amount,
         address _collateralAddress
@@ -103,16 +97,19 @@ contract PoolEngine {
     function mintDSC(uint256 _amount) internal isMoreThanZero(_amount) {
         s_usertomintedDSC[msg.sender] += _amount;
 
-        s_dscToken.mintToken(msg.sender, _amount);
+        bool success = i_dscToken.mintToken(msg.sender, _amount);
+        if (!success) {
+            revert PoolEngine__MintFailed();
+        }
         emit DSCEngine_minted(msg.sender);
     }
 
-    function burnDSC(
-        address _user,
-        uint256 _amount
-    ) internal isMoreThanZero(_amount) {
-        s_usertomintedDSC[_user] -= _amount;
-        s_dscToken.burnTokens(_amount);
+    function redeemCollateralAndBurnDSC(
+        uint256 _amount,
+        address _tokenCollateral
+    ) external {
+        redeemCollateral(_amount, _tokenCollateral, address(this), msg.sender);
+        burnDSC(msg.sender, _amount);
     }
 
     function redeemCollateral(
@@ -120,7 +117,7 @@ contract PoolEngine {
         address _collateralAddress,
         address _from,
         address _to
-    ) internal {
+    ) internal isMoreThanZero(_amount) isTokenAllowed(_collateralAddress) {
         s_userToCollateral[_from][_collateralAddress] -= _amount;
         bool success = IERC20(_collateralAddress).transferFrom(
             _from,
@@ -131,6 +128,15 @@ contract PoolEngine {
         if (!success) {
             revert PoolEngine__RedeemFailed();
         }
+    }
+
+    function burnDSC(
+        address _user,
+        uint256 _amount
+    ) internal isMoreThanZero(_amount) {
+        s_usertomintedDSC[_user] -= _amount;
+        emit DSCEngine_tokensBurnt(_user, _amount);
+        i_dscToken.burnTokens(_amount);
     }
 
     function liquidate(
@@ -158,26 +164,6 @@ contract PoolEngine {
     }
 
     //LIQUIDATION HELPER FUNCTIONS
-
-    //Helper Functions
-
-    function getCollateralAmountInUsd(
-        address _collateralTypeAddress,
-        uint256 _amount
-    )
-        internal
-        view
-        isTokenAllowed(_collateralTypeAddress)
-        isMoreThanZero(_amount)
-        returns (uint256)
-    {
-        (, int256 price, , , ) = AggregatorV3Interface(_collateralTypeAddress)
-            .latestRoundData();
-        return
-            ((uint256(price) * MULTIPLICATION_PRECISION) * _amount) /
-            DIVISION_PRECISION;
-    }
-
     function checkHealthFactor(address user) public view returns (uint256) {
         uint256 totalAmount = getCollateral(user);
         return
@@ -195,6 +181,23 @@ contract PoolEngine {
             );
         }
         return totalAmount;
+    }
+
+    function getCollateralAmountInUsd(
+        address _collateralTypeAddress,
+        uint256 _amount
+    )
+        internal
+        view
+        isTokenAllowed(_collateralTypeAddress)
+        isMoreThanZero(_amount)
+        returns (uint256)
+    {
+        (, int256 price, , , ) = AggregatorV3Interface(_collateralTypeAddress)
+            .latestRoundData();
+        return
+            ((uint256(price) * MULTIPLICATION_PRECISION) * _amount) /
+            DIVISION_PRECISION;
     }
 
     function calculateAdjustedCollateral(

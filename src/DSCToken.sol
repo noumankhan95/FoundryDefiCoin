@@ -10,14 +10,18 @@ contract DSCToken is ERC20Burnable, Ownable {
 
     constructor() ERC20("LIFI Token", "LF") Ownable(msg.sender) {}
 
-    function mintToken(address _account, uint256 _amount) external {
+    function mintToken(
+        address _account,
+        uint256 _amount
+    ) external onlyOwner returns (bool) {
         if (_account == address(0)) {
             revert DSCToken__ZeroAddress();
         }
         _mint(_account, _amount);
+        return true;
     }
 
-    function burnTokens(uint256 _amount) external {
+    function burnTokens(uint256 _amount) external onlyOwner {
         if (_amount == 0) {
             revert DSCToken__AmountShouldbeMoreThanZero();
         }
