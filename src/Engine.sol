@@ -186,13 +186,7 @@ contract PoolEngine {
     function getCollateralAmountInUsd(
         address _collateralTypeAddress,
         uint256 _amount
-    )
-        internal
-        view
-        isTokenAllowed(_collateralTypeAddress)
-        isMoreThanZero(_amount)
-        returns (uint256)
-    {
+    ) public view isMoreThanZero(_amount) returns (uint256) {
         (, int256 price, , , ) = AggregatorV3Interface(_collateralTypeAddress)
             .latestRoundData();
         return

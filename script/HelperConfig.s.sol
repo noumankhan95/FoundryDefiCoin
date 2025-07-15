@@ -3,7 +3,8 @@ pragma solidity ^0.8.18;
 import {Script} from "forge-std/Script.sol";
 import {AggregatorV3Interface} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {TestMockV3Aggregator} from "test/mocks/AggregatorV3.t.sol";
-import {ERC20} from "test/mocks/ERC20.t.sol";
+import {ERC20Mock} from "test/mocks/ERC20.t.sol";
+import {console} from "forge-std/console.sol";
 
 contract HelperConfig is Script {
     error HelperConfig__InvalidNetworkConfig();
@@ -27,7 +28,8 @@ contract HelperConfig is Script {
             activeNetworkConfig = getSepoliaEthConfig();
             return activeNetworkConfig;
         } else {
-            return getAnvilConfig();
+            activeNetworkConfig = getAnvilConfig();
+            return activeNetworkConfig;
         }
     }
 
@@ -70,8 +72,9 @@ contract HelperConfig is Script {
             DECIMALS,
             BTC_USD_PRICE
         );
-        ERC20 wbtcMock = new ERC20("WBTC MOCK", "wbtc");
-        ERC20 wethMock = new ERC20("WETH MOCK", "weth");
+        ERC20Mock wbtcMock = new ERC20Mock("WBTC MOCK", "wbtc");
+        ERC20Mock wethMock = new ERC20Mock("WETH MOCK", "weth");
+        console.log(address(wbtcMock));
         return
             NetworkConfig({
                 wbtc: address(wbtcMock),
