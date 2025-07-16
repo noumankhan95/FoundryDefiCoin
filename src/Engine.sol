@@ -112,7 +112,7 @@ contract PoolEngine {
         address _tokenCollateral,
         uint256 _amountToBurn
     ) external {
-        redeemCollateral(_amount, _tokenCollateral, address(this), msg.sender);
+        redeemCollateral(_amount, _tokenCollateral, msg.sender,address(this));
         burnDSC(msg.sender, _amountToBurn);
     }
 
@@ -122,7 +122,7 @@ contract PoolEngine {
         address _from,
         address _to
     ) public isMoreThanZero(_amount) {
-        s_userToCollateral[_to][_collateralAddress] -= _amount;
+        s_userToCollateral[_from][_collateralAddress] -= _amount;
         bool success = IERC20(_collateralAddress).transfer(_to, _amount);
         emit DSCEngine_collateralRedeemed(_from, _amount);
         if (!success) {
@@ -137,7 +137,7 @@ contract PoolEngine {
         s_usertomintedDSC[_user] -= _amount;
         i_dscToken.transferFrom(_user, address(this), _amount);
         emit DSCEngine_tokensBurnt(_user, _amount);
-        i_dscToken.burnTokens(_amount, _user);
+        i_dscToken.burnTokens(_amount);
     }
 
     function liquidate(
@@ -155,7 +155,7 @@ contract PoolEngine {
         );
         uint256 incentive = (totalCollateral * INCENTIVE) / DIVISION_PRECISION;
         uint256 totalIncentive = totalCollateral + incentive;
-
+        burnDSC(_user, _debt);
         redeemCollateral(totalIncentive, _collateralAddress, _user, msg.sender);
 
         uint256 endingHealthFactor = checkHealthFactor(msg.sender);

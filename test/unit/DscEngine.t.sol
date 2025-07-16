@@ -186,11 +186,11 @@ contract DSCTest is Test {
 
     //REDEEM collateral TESTS
     function testCanRedeemCollateral() public mintandDepositDSC {
-        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        console.log(ERC20Mock(activeNetwork.weth).balanceOf(address(pool)));
         pool.redeemCollateral(
             0.6 ether,
             activeNetwork.weth,
-            address(pool),
+            user,
             user
         );
 
@@ -202,7 +202,7 @@ contract DSCTest is Test {
         vm.expectRevert(
             PoolEngine.PoolEngine__AmountMustbeMoreThanZero.selector
         );
-        pool.redeemCollateral(0 ether, activeNetwork.weth, address(pool), user);
+        pool.redeemCollateral(0 ether, activeNetwork.weth, user, address(pool));
     }
 
     function testRedeemAndBurn() public {
@@ -253,22 +253,25 @@ contract DSCTest is Test {
             activeNetwork.weth,
             600000000000000000000
         );
-        console.log(engine.checkHealthFactor(user) / 1e18);
-        TestMockV3Aggregator(activeNetwork.wethUsdPriceFeed).updateAnswer(
-            18e8
+        vm.stopPrank();
+        address liquidator = makeAddr("liquidator");
+
+        vm.startPrank(liquidator);
+        ERC20Mock(activeNetwork.weth).mint(liquidator, 20 ether);
+        ERC20Mock(activeNetwork.weth).balanceOf(liquidator);
+
+        TestMockV3Aggregator(activeNetwork.wethUsdPriceFeed).updateAnswer(18e8);
+        ERC20Mock(activeNetwork.weth).approve(address(engine), 900 ether);
+
+        engine.depositCollateralAndMintDSC(
+            1 ether,
+            activeNetwork.weth,
+            900 ether
         );
-        console.log(engine.getMintedDSCByUser(user));
-        console.log(
-            engine.checkHealthFactor(user) < 1e18,
-            "POST HEALTH FACTOR"
-        );
-        console.log(engine.getCollateral(user));
-        console.log(
-            engine.getCollateralAmountInUsd(
-                activeNetwork.wethUsdPriceFeed,
-                0.6 ether
-            ) / 600000000000000000000,
-            "cpllateral"
+        engine.liquidate(
+            user,
+            ERC20Mock(activeNetwork.weth).balanceOf(user),
+            activeNetwork.weth
         );
         vm.stopPrank();
     }
