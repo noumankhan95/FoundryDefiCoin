@@ -60,7 +60,7 @@ contract DSCTest is Test {
         assert(expectedWethBalance == STARTING_USER_BALANCE);
     }
 
-    function testPriceFeed() external {
+    function testPriceFeed() external view {
         uint256 _testamount = 0.8 ether;
         uint256 _amount = pool.getCollateralAmountInUsd(
             activeNetwork.wethUsdPriceFeed,
@@ -70,7 +70,132 @@ contract DSCTest is Test {
         assert(_amount == 1600000000000000000000);
     }
 
+    //DEPOSIT and MINT TESTS
+
     function testDepositCollateral() external {
         // vm.prank(deployer);
+        uint256 startingBalance = ERC20Mock(activeNetwork.weth).balanceOf(user);
+        console.log(startingBalance / 1e18, "start Balance");
+        vm.startPrank(user);
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        pool.depositCollateral(0.6 ether, activeNetwork.weth);
+        uint256 endingBalance = ERC20Mock(activeNetwork.weth).balanceOf(user);
+        console.log(endingBalance / 1e18, "end Balance");
+
+        vm.stopPrank();
+        assert(endingBalance == startingBalance - 0.6 ether);
+    }
+
+    function testapprovedTokenUsersIsUpdating() external {
+        vm.startPrank(user);
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+
+        uint256 _adjustedUDSPrice = pool.getCollateralAmountInUsd(
+            activeNetwork.wethUsdPriceFeed,
+            0.6 ether
+        );
+        uint256 _amountToMint = pool.calculateAdjustedCollateral(
+            _adjustedUDSPrice
+        );
+
+        pool.depositCollateralAndMintDSC(
+            0.6 ether,
+            activeNetwork.weth,
+            _amountToMint
+        );
+        assert(
+            pool.getUserToCollateralValue(user, activeNetwork.weth) == 0.6 ether
+        );
+    }
+
+    function testCanDepositAndMint() external {
+        uint256 startingBalanceWeth = ERC20Mock(activeNetwork.weth).balanceOf(
+            user
+        );
+        vm.startPrank(user);
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        uint256 _adjustedUDSPrice = pool.getCollateralAmountInUsd(
+            activeNetwork.wethUsdPriceFeed,
+            0.6 ether
+        );
+        uint256 _amountToMint = pool.calculateAdjustedCollateral(
+            _adjustedUDSPrice
+        );
+
+        pool.depositCollateralAndMintDSC(
+            0.6 ether,
+            activeNetwork.weth,
+            _amountToMint
+        );
+        uint256 endingBalanceWeth = ERC20Mock(activeNetwork.weth).balanceOf(
+            user
+        );
+        uint256 dscAmount = token.balanceOf(user);
+        vm.stopPrank();
+        assert(endingBalanceWeth == startingBalanceWeth - 0.6 ether);
+        assert(dscAmount == 600000000000000000000);
+    }
+
+    //TEST minting healthFactor Checks
+
+    function testHealthFactor() external mintandDepositDSC {
+        uint256 healthFactor = pool.checkHealthFactor(address(user));
+        assert(healthFactor == 1e18);
+        vm.stopPrank();
+    }
+
+    modifier mintandDepositDSC() {
+        vm.startPrank(user);
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        uint256 _adjustedUDSPrice = pool.getCollateralAmountInUsd(
+            activeNetwork.wethUsdPriceFeed,
+            0.6 ether
+        );
+        uint256 _amountToMint = pool.calculateAdjustedCollateral(
+            _adjustedUDSPrice
+        );
+
+        pool.depositCollateralAndMintDSC(
+            0.6 ether,
+            activeNetwork.weth,
+            _amountToMint
+        );
+        vm.stopPrank();
+        _;
+    }
+
+    function testMintingFailsIfHealthFactorIsDown() public mintandDepositDSC {
+        vm.startPrank(user);
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        uint256 _adjustedUDSPrice = pool.getCollateralAmountInUsd(
+            activeNetwork.wethUsdPriceFeed,
+            0.6 ether
+        );
+        uint256 _amountToMint = pool.calculateAdjustedCollateral(
+            _adjustedUDSPrice
+        );
+
+        pool.depositCollateralAndMintDSC(
+            0.6 ether,
+            activeNetwork.weth,
+            _amountToMint
+        );
+        vm.expectRevert(PoolEngine.PoolEngine__HealthyHealthFactor.selector);
+        pool.mintDSC(_amountToMint);
+        vm.stopPrank();
+    }
+
+    //REDEEM collateral TESTS
+    function testCanRedeemCollateral() public mintandDepositDSC {
+        console.log(pool.getUserToCollateralValue(user, activeNetwork.weth));
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        pool.redeemCollateral(
+            0.6 ether,
+            activeNetwork.weth,
+            address(pool),
+            user
+        );
+
+        assert(ERC20Mock(activeNetwork.weth).balanceOf(user) == 10 ether);
     }
 }

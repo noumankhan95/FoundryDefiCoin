@@ -73,16 +73,18 @@ contract PoolEngine {
     //Main Functionality
     function depositCollateralAndMintDSC(
         uint256 _amount,
-        address _collateralAddress
+        address _collateralAddress,
+        uint256 _amountToMint
     ) external isMoreThanZero(_amount) isTokenAllowed(_collateralAddress) {
         depositCollateral(_amount, _collateralAddress);
-        mintDSC(_amount);
+        mintDSC(_amountToMint);
     }
 
     function depositCollateral(
         uint256 _amount,
         address _collateralAddress
-    ) internal {
+    ) public {
+        s_userToCollateral[msg.sender][_collateralAddress] += _amount;
         bool success = IERC20(_collateralAddress).transferFrom(
             msg.sender,
             address(this),
@@ -94,7 +96,7 @@ contract PoolEngine {
         emit DSCEngine_collateralDeposited(msg.sender, _amount);
     }
 
-    function mintDSC(uint256 _amount) internal isMoreThanZero(_amount) {
+    function mintDSC(uint256 _amount) public isMoreThanZero(_amount) {
         s_usertomintedDSC[msg.sender] += _amount;
 
         bool success = i_dscToken.mintToken(msg.sender, _amount);
@@ -102,6 +104,7 @@ contract PoolEngine {
             revert PoolEngine__MintFailed();
         }
         emit DSCEngine_minted(msg.sender);
+        revertIfHealthFactorIsDown(msg.sender);
     }
 
     function redeemCollateralAndBurnDSC(
@@ -117,13 +120,9 @@ contract PoolEngine {
         address _collateralAddress,
         address _from,
         address _to
-    ) internal isMoreThanZero(_amount) isTokenAllowed(_collateralAddress) {
-        s_userToCollateral[_from][_collateralAddress] -= _amount;
-        bool success = IERC20(_collateralAddress).transferFrom(
-            _from,
-            _to,
-            _amount
-        );
+    ) public isMoreThanZero(_amount) {
+        s_userToCollateral[_to][_collateralAddress] -= _amount;
+        bool success = IERC20(_collateralAddress).transfer(_to, _amount);
         emit DSCEngine_collateralRedeemed(_from, _amount);
         if (!success) {
             revert PoolEngine__RedeemFailed();
@@ -166,21 +165,28 @@ contract PoolEngine {
     //LIQUIDATION HELPER FUNCTIONS
     function checkHealthFactor(address user) public view returns (uint256) {
         uint256 totalAmount = getCollateral(user);
-        return
-            (calculateAdjustedCollateral(totalAmount) * DIVISION_PRECISION) /
-            s_usertomintedDSC[user];
+        return (totalAmount * DIVISION_PRECISION) / s_usertomintedDSC[user];
     }
 
-    function getCollateral(address _user) internal view returns (uint256) {
+    function getCollateral(address _user) public view returns (uint256) {
         uint256 totalAmount;
 
         for (uint256 i = 0; i < s_approvedTokens.length; i++) {
-            totalAmount += getCollateralAmountInUsd(
-                s_approvedTokens[i],
-                s_userToCollateral[_user][s_approvedTokens[i]]
-            );
+            if (s_userToCollateral[_user][s_approvedTokens[i]] != 0) {
+                totalAmount += getCollateralAmountInUsd(
+                    s_tokenToPriceFeed[s_approvedTokens[i]],
+                    s_userToCollateral[_user][s_approvedTokens[i]]
+                );
+            }
         }
         return totalAmount;
+    }
+
+    function revertIfHealthFactorIsDown(address _user) public view {
+        uint256 health = checkHealthFactor(_user);
+        if (health < MIN_HEALTH_FACTOR) {
+            revert PoolEngine__HealthyHealthFactor();
+        }
     }
 
     function getCollateralAmountInUsd(
@@ -196,8 +202,19 @@ contract PoolEngine {
 
     function calculateAdjustedCollateral(
         uint256 _amount
-    ) internal pure returns (uint256) {
+    ) public pure returns (uint256) {
         return
             (_amount * LIQUIDATION_THRESHOLD) / ADDITIONAL_DIVISION_PRECISION;
+    }
+
+    function getUserToCollateralValue(
+        address _user,
+        address _collateral
+    ) public view returns (uint256) {
+        return s_userToCollateral[_user][_collateral];
+    }
+
+    function getMintedDSCByUser(address _user) public view returns (uint256) {
+        return s_usertomintedDSC[_user];
     }
 }
