@@ -109,10 +109,11 @@ contract PoolEngine {
 
     function redeemCollateralAndBurnDSC(
         uint256 _amount,
-        address _tokenCollateral
+        address _tokenCollateral,
+        uint256 _amountToBurn
     ) external {
         redeemCollateral(_amount, _tokenCollateral, address(this), msg.sender);
-        burnDSC(msg.sender, _amount);
+        burnDSC(msg.sender, _amountToBurn);
     }
 
     function redeemCollateral(
@@ -134,8 +135,9 @@ contract PoolEngine {
         uint256 _amount
     ) internal isMoreThanZero(_amount) {
         s_usertomintedDSC[_user] -= _amount;
+        i_dscToken.transferFrom(_user, address(this), _amount);
         emit DSCEngine_tokensBurnt(_user, _amount);
-        i_dscToken.burnTokens(_amount);
+        i_dscToken.burnTokens(_amount, _user);
     }
 
     function liquidate(

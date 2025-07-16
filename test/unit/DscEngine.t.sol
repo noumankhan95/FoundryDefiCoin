@@ -198,4 +198,38 @@ contract DSCTest is Test {
 
         assert(ERC20Mock(activeNetwork.weth).balanceOf(user) == 10 ether);
     }
+
+    function testrevertifAmountisZero() public mintandDepositDSC {
+        console.log(pool.getUserToCollateralValue(user, activeNetwork.weth));
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        vm.expectRevert(
+            PoolEngine.PoolEngine__AmountMustbeMoreThanZero.selector
+        );
+        pool.redeemCollateral(0 ether, activeNetwork.weth, address(pool), user);
+    }
+
+    function testRedeemAndBurn() public {
+        vm.startPrank(user);
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
+        uint256 _adjustedUDSPrice = pool.getCollateralAmountInUsd(
+            activeNetwork.wethUsdPriceFeed,
+            0.6 ether
+        );
+        uint256 _amountToMint = pool.calculateAdjustedCollateral(
+            _adjustedUDSPrice
+        );
+        pool.depositCollateralAndMintDSC(
+            0.6 ether,
+            activeNetwork.weth,
+            _amountToMint
+        );
+        console.log(token.balanceOf(user), "USER TOKEN");
+        console.log(_amountToMint);
+        token.approve(address(pool), _amountToMint);
+        pool.redeemCollateralAndBurnDSC(
+            0.6 ether,
+            activeNetwork.weth,
+            _amountToMint
+        );
+    }
 }

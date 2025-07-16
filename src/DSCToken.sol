@@ -21,13 +21,11 @@ contract DSCToken is ERC20Burnable, Ownable {
         return true;
     }
 
-    function burnTokens(uint256 _amount) external onlyOwner {
+    function burnTokens(uint256 _amount, address _user) external onlyOwner {
         if (_amount == 0) {
             revert DSCToken__AmountShouldbeMoreThanZero();
         }
-        if (balanceOf(msg.sender) < _amount) {
-            revert DSCToken__BalanceNotEnough();
-        }
+
         burn(_amount);
     }
 }
