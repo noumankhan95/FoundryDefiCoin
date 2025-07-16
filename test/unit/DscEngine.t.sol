@@ -9,6 +9,8 @@ import {HelperConfig} from "script/HelperConfig.s.sol";
 import {ERC20Mock} from "test/mocks/ERC20.t.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 import {console} from "forge-std/console.sol";
+import {ERC20MockDebt} from "../mocks/MockMoreDebtDSC.sol";
+import {TestMockV3Aggregator} from "test/mocks/AggregatorV3.t.sol";
 
 contract DSCTest is Test {
     DSCToken token;
@@ -66,7 +68,6 @@ contract DSCTest is Test {
             activeNetwork.wethUsdPriceFeed,
             _testamount
         );
-        console.log(_amount);
         assert(_amount == 1600000000000000000000);
     }
 
@@ -75,12 +76,10 @@ contract DSCTest is Test {
     function testDepositCollateral() external {
         // vm.prank(deployer);
         uint256 startingBalance = ERC20Mock(activeNetwork.weth).balanceOf(user);
-        console.log(startingBalance / 1e18, "start Balance");
         vm.startPrank(user);
         ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
         pool.depositCollateral(0.6 ether, activeNetwork.weth);
         uint256 endingBalance = ERC20Mock(activeNetwork.weth).balanceOf(user);
-        console.log(endingBalance / 1e18, "end Balance");
 
         vm.stopPrank();
         assert(endingBalance == startingBalance - 0.6 ether);
@@ -187,7 +186,6 @@ contract DSCTest is Test {
 
     //REDEEM collateral TESTS
     function testCanRedeemCollateral() public mintandDepositDSC {
-        console.log(pool.getUserToCollateralValue(user, activeNetwork.weth));
         ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
         pool.redeemCollateral(
             0.6 ether,
@@ -200,7 +198,6 @@ contract DSCTest is Test {
     }
 
     function testrevertifAmountisZero() public mintandDepositDSC {
-        console.log(pool.getUserToCollateralValue(user, activeNetwork.weth));
         ERC20Mock(activeNetwork.weth).approve(address(pool), 0.6 ether);
         vm.expectRevert(
             PoolEngine.PoolEngine__AmountMustbeMoreThanZero.selector
@@ -223,13 +220,56 @@ contract DSCTest is Test {
             activeNetwork.weth,
             _amountToMint
         );
-        console.log(token.balanceOf(user), "USER TOKEN");
-        console.log(_amountToMint);
         token.approve(address(pool), _amountToMint);
         pool.redeemCollateralAndBurnDSC(
             0.6 ether,
             activeNetwork.weth,
             _amountToMint
         );
+    }
+
+    //liquidate Tests
+
+    function testLiquidationSetUp() public {
+        // address owner = msg.sender;
+        // owner.deal();
+        vm.startPrank(user);
+        ERC20MockDebt moreDebtToken = new ERC20MockDebt(activeNetwork.weth);
+        _approvedTokens = [activeNetwork.weth];
+        _priceFeeds = [activeNetwork.wethUsdPriceFeed];
+
+        PoolEngine engine = new PoolEngine(
+            _approvedTokens,
+            _priceFeeds,
+            address(moreDebtToken)
+        );
+        moreDebtToken.transferOwnership(address(engine));
+        ERC20Mock(activeNetwork.weth).approve(
+            address(engine),
+            600000000000000000000
+        );
+        engine.depositCollateralAndMintDSC(
+            0.6 ether,
+            activeNetwork.weth,
+            600000000000000000000
+        );
+        console.log(engine.checkHealthFactor(user) / 1e18);
+        TestMockV3Aggregator(activeNetwork.wethUsdPriceFeed).updateAnswer(
+            18e8
+        );
+        console.log(engine.getMintedDSCByUser(user));
+        console.log(
+            engine.checkHealthFactor(user) < 1e18,
+            "POST HEALTH FACTOR"
+        );
+        console.log(engine.getCollateral(user));
+        console.log(
+            engine.getCollateralAmountInUsd(
+                activeNetwork.wethUsdPriceFeed,
+                0.6 ether
+            ) / 600000000000000000000,
+            "cpllateral"
+        );
+        vm.stopPrank();
     }
 }
