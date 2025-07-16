@@ -6,6 +6,7 @@ import {TestMockV3Aggregator} from "./AggregatorV3.t.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract ERC20MockDebt is ERC20Burnable, Ownable {
+    error DSCToken__AmountShouldbeMoreThanZero();
     address mockAggregator;
 
     constructor(
@@ -23,5 +24,13 @@ contract ERC20MockDebt is ERC20Burnable, Ownable {
 
         _mint(_user, _amount);
         return true;
+    }
+
+    function burnTokens(uint256 _amount) external onlyOwner {
+        if (_amount == 0) {
+            revert DSCToken__AmountShouldbeMoreThanZero();
+        }
+
+        burn(_amount);
     }
 }

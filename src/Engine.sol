@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 import {DSCToken} from "./DSCToken.sol";
 import {AggregatorV3Interface} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {console} from "forge-std/console.sol";
 
 contract PoolEngine {
     //Errors
@@ -112,7 +113,7 @@ contract PoolEngine {
         address _tokenCollateral,
         uint256 _amountToBurn
     ) external {
-        redeemCollateral(_amount, _tokenCollateral, msg.sender,address(this));
+        redeemCollateral(_amount, _tokenCollateral, msg.sender, address(this));
         burnDSC(msg.sender, _amountToBurn);
     }
 
@@ -135,8 +136,8 @@ contract PoolEngine {
         uint256 _amount
     ) internal isMoreThanZero(_amount) {
         s_usertomintedDSC[_user] -= _amount;
-        i_dscToken.transferFrom(_user, address(this), _amount);
-        emit DSCEngine_tokensBurnt(_user, _amount);
+        i_dscToken.transferFrom(msg.sender, address(this), _amount);
+        emit DSCEngine_tokensBurnt(msg.sender, _amount);
         i_dscToken.burnTokens(_amount);
     }
 
@@ -145,18 +146,31 @@ contract PoolEngine {
         uint256 _debt,
         address _collateralAddress
     ) external isMoreThanZero(_debt) isTokenAllowed(_collateralAddress) {
+        console.log("Liquidating user: ", _user);
         uint256 healthFactor = checkHealthFactor(_user);
         if (healthFactor >= MIN_HEALTH_FACTOR) {
             revert PoolEngine__HealthyHealthFactor();
         }
         uint256 totalCollateral = getCollateralAmountInUsd(
-            _collateralAddress,
+            s_tokenToPriceFeed[_collateralAddress],
             _debt
         );
         uint256 incentive = (totalCollateral * INCENTIVE) / DIVISION_PRECISION;
         uint256 totalIncentive = totalCollateral + incentive;
+        uint256 totalUsdToRedeem = _debt + incentive;
+
+        // ✅ Convert USD → token amount
+        uint256 tokenAmountToRedeem = getTokenAmountFromUsd(
+            _collateralAddress,
+            totalUsdToRedeem
+        );
+        console.log("total", tokenAmountToRedeem);
+        console.log(
+            "balance",
+            getUserToCollateralValue(_user, _collateralAddress)
+        );
+        redeemCollateral(tokenAmountToRedeem, _collateralAddress, _user, msg.sender);
         burnDSC(_user, _debt);
-        redeemCollateral(totalIncentive, _collateralAddress, _user, msg.sender);
 
         uint256 endingHealthFactor = checkHealthFactor(msg.sender);
         if (endingHealthFactor >= MIN_HEALTH_FACTOR) {
@@ -218,5 +232,18 @@ contract PoolEngine {
 
     function getMintedDSCByUser(address _user) public view returns (uint256) {
         return s_usertomintedDSC[_user];
+    }
+
+    function getTokenAmountFromUsd(
+        address _collateralAddress,
+        uint256 usdAmount
+    ) public view returns (uint256) {
+        (, int256 price, , , ) = AggregatorV3Interface(
+            s_tokenToPriceFeed[_collateralAddress]
+        ).latestRoundData();
+        // price = 8 decimals, MULTIPLICATION_PRECISION = 1e10, to scale to 1e18
+        return
+            (usdAmount * DIVISION_PRECISION) /
+            (uint256(price) * MULTIPLICATION_PRECISION);
     }
 }

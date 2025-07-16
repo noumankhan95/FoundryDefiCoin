@@ -187,12 +187,7 @@ contract DSCTest is Test {
     //REDEEM collateral TESTS
     function testCanRedeemCollateral() public mintandDepositDSC {
         console.log(ERC20Mock(activeNetwork.weth).balanceOf(address(pool)));
-        pool.redeemCollateral(
-            0.6 ether,
-            activeNetwork.weth,
-            user,
-            user
-        );
+        pool.redeemCollateral(0.6 ether, activeNetwork.weth, user, user);
 
         assert(ERC20Mock(activeNetwork.weth).balanceOf(user) == 10 ether);
     }
@@ -259,8 +254,6 @@ contract DSCTest is Test {
         vm.startPrank(liquidator);
         ERC20Mock(activeNetwork.weth).mint(liquidator, 20 ether);
         ERC20Mock(activeNetwork.weth).balanceOf(liquidator);
-
-        TestMockV3Aggregator(activeNetwork.wethUsdPriceFeed).updateAnswer(18e8);
         ERC20Mock(activeNetwork.weth).approve(address(engine), 900 ether);
 
         engine.depositCollateralAndMintDSC(
@@ -268,9 +261,14 @@ contract DSCTest is Test {
             activeNetwork.weth,
             900 ether
         );
+
+        TestMockV3Aggregator(activeNetwork.wethUsdPriceFeed).updateAnswer(18e8);
+        console.log(engine.checkHealthFactor(user) > 1e18, "Healh factor");
+        moreDebtToken.approve(address(engine), type(uint256).max);
+
         engine.liquidate(
             user,
-            ERC20Mock(activeNetwork.weth).balanceOf(user),
+            engine.getMintedDSCByUser(user),
             activeNetwork.weth
         );
         vm.stopPrank();
