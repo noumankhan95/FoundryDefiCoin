@@ -159,17 +159,17 @@ contract PoolEngine {
         uint256 totalIncentive = totalCollateral + incentive;
         uint256 totalUsdToRedeem = _debt + incentive;
 
-        // ✅ Convert USD → token amount
         uint256 tokenAmountToRedeem = getTokenAmountFromUsd(
             _collateralAddress,
             totalUsdToRedeem
         );
-        console.log("total", tokenAmountToRedeem);
-        console.log(
-            "balance",
-            getUserToCollateralValue(_user, _collateralAddress)
+
+        redeemCollateral(
+            tokenAmountToRedeem,
+            _collateralAddress,
+            _user,
+            msg.sender
         );
-        redeemCollateral(tokenAmountToRedeem, _collateralAddress, _user, msg.sender);
         burnDSC(_user, _debt);
 
         uint256 endingHealthFactor = checkHealthFactor(msg.sender);

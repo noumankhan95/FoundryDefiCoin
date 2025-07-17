@@ -261,16 +261,32 @@ contract DSCTest is Test {
             activeNetwork.weth,
             900 ether
         );
-
+        console.log(moreDebtToken.balanceOf(user), "balance");
+        console.log(engine.getMintedDSCByUser(user), "2 balance");
         TestMockV3Aggregator(activeNetwork.wethUsdPriceFeed).updateAnswer(18e8);
-        console.log(engine.checkHealthFactor(user) > 1e18, "Healh factor");
+
         moreDebtToken.approve(address(engine), type(uint256).max);
 
-        engine.liquidate(
-            user,
-            engine.getMintedDSCByUser(user),
-            activeNetwork.weth
+        engine.liquidate(user, 10 ether, activeNetwork.weth);
+        vm.stopPrank();
+    }
+
+    function testCantLiquidateGoodHealth() public {
+        vm.startPrank(user);
+        ERC20Mock(activeNetwork.weth).approve(address(pool), 2 ether);
+        pool.depositCollateralAndMintDSC(
+            2 ether,
+            activeNetwork.weth,
+            200 ether
         );
+        vm.stopPrank();
+        address liquidator = makeAddr("liquidator");
+        vm.startPrank(liquidator);
+        ERC20Mock(activeNetwork.weth).mint(liquidator, 100 ether);
+        ERC20Mock(activeNetwork.weth).approve(address(pool),10 ether);
+        pool.depositCollateralAndMintDSC(6 ether,activeNetwork.weth,250 ether);
+        vm.expectRevert(PoolEngine.PoolEngine__HealthyHealthFactor.selector);
+        pool.liquidate(user,200 ether,activeNetwork.weth);
         vm.stopPrank();
     }
 }
