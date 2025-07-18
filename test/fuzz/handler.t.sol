@@ -4,6 +4,8 @@ pragma solidity ^0.8.18;
 import {DSCToken} from "src/DSCToken.sol";
 import {PoolEngine} from "src/Engine.sol";
 import {Test} from "forge-std/Test.sol";
+import {ERC20Mock} from "test/mocks/ERC20.t.sol";
+import {console} from "forge-std/console.sol";
 
 contract Handler is Test {
     DSCToken immutable i_token;
@@ -23,17 +25,31 @@ contract Handler is Test {
         i_wbtc = _wbtc;
     }
 
-    function depositCollateral(
+    function mintAndDepositCollateral(
         uint256 _collateralseed,
         uint256 _amount
     ) public {
         address collateralAddress = collateralSeed(_collateralseed);
-        bound(_amount, 0, type(uint256).max);
+     
+        _amount = bound(_amount, 0, type(uint96).max);
+        if (_amount == 0) {
+            return;
+        }
+        vm.startPrank(msg.sender);
+        ERC20Mock(collateralAddress).mint(msg.sender, _amount);
+        ERC20Mock(collateralAddress).approve(address(i_engine), _amount);
+        console.log("Minting to:", msg.sender);
+        console.log("Amount:", _amount);
+        console.log(
+            "Balance after mint:",
+            ERC20Mock(collateralAddress).balanceOf(msg.sender)
+        );
         i_engine.depositCollateral(_amount, collateralAddress);
+        vm.stopPrank();
     }
 
     function mintDSC(uint256 _amount) public {
-        bound(_amount, 0, type(uint256).max);
+        _amount = bound(_amount, 1, type(uint96).max);
         i_engine.mintDSC(_amount);
     }
 
@@ -41,7 +57,7 @@ contract Handler is Test {
 
     function collateralSeed(
         uint256 _collateralseed
-    ) internal view returns (address) {
+    ) private view returns (address) {
         if (_collateralseed % 2 == 0) {
             return i_weth;
         }

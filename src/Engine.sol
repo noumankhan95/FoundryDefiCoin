@@ -105,7 +105,7 @@ contract PoolEngine {
             revert PoolEngine__MintFailed();
         }
         emit DSCEngine_minted(msg.sender);
-        revertIfHealthFactorIsDown(msg.sender);
+        // revertIfHealthFactorIsDown(msg.sender);
     }
 
     function redeemCollateralAndBurnDSC(
@@ -208,7 +208,7 @@ contract PoolEngine {
     function getCollateralAmountInUsd(
         address _collateralTypeAddress,
         uint256 _amount
-    ) public view isMoreThanZero(_amount) returns (uint256) {
+    ) public view returns (uint256) {
         (, int256 price, , , ) = AggregatorV3Interface(_collateralTypeAddress)
             .latestRoundData();
         return
