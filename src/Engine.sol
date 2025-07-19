@@ -134,7 +134,7 @@ contract PoolEngine {
     function burnDSC(
         address _user,
         uint256 _amount
-    ) internal isMoreThanZero(_amount) {
+    ) public isMoreThanZero(_amount) {
         s_usertomintedDSC[_user] -= _amount;
         i_dscToken.transferFrom(msg.sender, address(this), _amount);
         emit DSCEngine_tokensBurnt(msg.sender, _amount);
@@ -146,7 +146,6 @@ contract PoolEngine {
         uint256 _debt,
         address _collateralAddress
     ) external isMoreThanZero(_debt) isTokenAllowed(_collateralAddress) {
-        console.log("Liquidating user: ", _user);
         uint256 healthFactor = checkHealthFactor(_user);
         if (healthFactor >= MIN_HEALTH_FACTOR) {
             revert PoolEngine__HealthyHealthFactor();

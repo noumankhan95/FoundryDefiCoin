@@ -22,14 +22,14 @@ contract DSCTest is Test {
     address deployer;
 
     function setUp() external {
-        (token, pool, config) = new DeployContract().run();
-        (
-            activeNetwork.wbtc,
-            activeNetwork.weth,
-            activeNetwork.deployerKey,
-            activeNetwork.wethUsdPriceFeed,
-            activeNetwork.wbtcUsdPriceFeed
-        ) = config.activeNetworkConfig();
+        (token, pool, activeNetwork) = new DeployContract().run();
+        // (
+        //     activeNetwork.wbtc,
+        //     activeNetwork.weth,
+        //     activeNetwork.deployerKey,
+        //     activeNetwork.wethUsdPriceFeed,
+        //     activeNetwork.wbtcUsdPriceFeed
+        // ) = config.activeNetworkConfig();
         // vm.prank(address(activeNetwork.deployerKey));
         ERC20Mock(activeNetwork.wbtc).mint(user, STARTING_USER_BALANCE);
         ERC20Mock(activeNetwork.weth).mint(user, STARTING_USER_BALANCE);

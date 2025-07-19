@@ -11,7 +11,10 @@ contract DeployContract is Script {
     address[] public _approvedTokens;
     address[] public _tokenPriceFeeds;
 
-    function run() external returns (DSCToken, PoolEngine, HelperConfig) {
+    function run()
+        external
+        returns (DSCToken, PoolEngine, HelperConfig.NetworkConfig memory)
+    {
         HelperConfig helper = new HelperConfig();
         HelperConfig.NetworkConfig memory config = helper.run();
         vm.startBroadcast(config.deployerKey);
@@ -25,6 +28,6 @@ contract DeployContract is Script {
         );
         s_dscToken.transferOwnership(address(s_engine));
         vm.stopBroadcast();
-        return (s_dscToken, s_engine, helper);
+        return (s_dscToken, s_engine, config);
     }
 }

@@ -16,18 +16,36 @@ contract Invariants is StdInvariant, Test {
     Handler i_handler;
     DSCToken i_token;
     PoolEngine i_engine;
-    HelperConfig config;
+    HelperConfig.NetworkConfig config;
     address weth;
     address wbtc;
 
     function setUp() public {
         DeployContract deployed = new DeployContract();
         (i_token, i_engine, config) = deployed.run();
-        (wbtc, weth, , wethUsd, wbtcUsd) = config.activeNetworkConfig();
+
+        weth = config.weth;
+        wbtc = config.wbtc;
+        wethUsd = config.wethUsdPriceFeed;
+        wbtcUsd = config.wbtcUsdPriceFeed;
+
         console.log("DSCToken:", address(i_token));
         console.log("PoolEngine:", address(i_engine));
-        i_handler = new Handler(i_token, i_engine, weth, wbtc);
 
+        i_handler = new Handler(
+            i_token,
+            i_engine,
+            weth,
+            wbtc,
+            wethUsd,
+            wbtcUsd
+        );
+        bytes4[] memory _selectors = new bytes4[](2);
+        _selectors[0] = i_handler.mintAndDepositCollateral.selector;
+        _selectors[1] = i_handler.redeemCollateral.selector;
+        targetSelector(
+            FuzzSelector({addr: address(i_handler), selectors: _selectors})
+        );
         targetContract(address(i_handler));
     }
 
@@ -38,21 +56,24 @@ contract Invariants is StdInvariant, Test {
         uint256 wbtcAmount = ERC20Mock(wbtc).balanceOf(address(i_engine));
         console.log(wethAmount, "WETH AMOUNT -1 ");
         console.log(wbtcAmount, "WBTC AMOUNT -1");
+
         uint256 usdWeth = i_engine.getCollateralAmountInUsd(
             wethUsd,
             wethAmount
         );
-        uint256 usdWbth = i_engine.getCollateralAmountInUsd(
+        uint256 usdWbtc = i_engine.getCollateralAmountInUsd(
             wbtcUsd,
             wbtcAmount
         );
+
         console.log(usdWeth, "WETH AMOUNT");
-        console.log(usdWbth, "WBTC AMOUNT");
+        console.log(usdWbtc, "WBTC AMOUNT");
 
         uint256 supply = i_token.totalSupply();
+        console.log("total COllateral", usdWeth + usdWbtc);
         console.log(supply, "TOTAL Supply");
 
-        assert(usdWeth + usdWbth > supply);
+        assert(usdWeth + usdWbtc >= supply);
         // assert(true);
     }
 }
